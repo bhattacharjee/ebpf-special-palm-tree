@@ -102,6 +102,7 @@ b.attach_kretprobe(event='__sys_sendto', fn_name='kretprobe_sys_sendto')
 #b.attach_kprobe(b.get_syscall_fnname('sendmsg'), fn_name='kprobe_sys_sendto')
 
 # An async function that binds to localhost:31337 (To get an output for the above)
+"""
 def call_bind_async():
     time.sleep(2)
     print('Calling bind...')
@@ -110,6 +111,27 @@ def call_bind_async():
 
 t = Thread(target=call_bind_async)
 t.start()
+"""
+
+print()
+print()
+print()
+print()
+print()
+print('*' * 80)
+print("All hooks attached. Starting to monitor now.")
+print('*' * 80)
+print()
+print()
+print()
+print()
+print("*** RESTART NGINX NOW ***")
+print()
+print("By default, the script monitors port 8080 and 8090")
+print("If you need a different port to be monitored, do the following")
+print("1. Find the function is_interesting_port() in bpf.c")
+print("2. Modify the body of the function to filter the listening ports you want")
+print("3. Restart ebpf.py and nginx")
 
 
 # This will open the BPF data structure for polling
