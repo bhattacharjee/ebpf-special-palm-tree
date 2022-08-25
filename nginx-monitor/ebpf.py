@@ -87,24 +87,19 @@ b.attach_kprobe(event='__sys_recvmsg', fn_name='kprobe_sys_recvmsg')
 b.attach_kretprobe(event='__sys_recvmsg', fn_name='kretprobesys_recvmsg')
 
 b.attach_kprobe(event='__sys_sendto', fn_name='kprobe_sys_sendto')
-#b.attach_kretprobe(event='__sys_sendto', fn_name='kretprobesys_sendto')
-b.attach_kprobe(event='__sys_sendmsg', fn_name='kprobe_sys_sendmsg')
-#b.attach_kretprobe(event='__sys_sendmsg', fn_name='kretprobesys_sendmsg')
+b.attach_kprobe(event='__sys_sendmsg', fn_name='kprobe_sys_sendto')
 
 b.attach_kprobe(event='do_writev', fn_name='kprobe_do_writev');
 b.attach_kretprobe(event='do_writev', fn_name='kretprobedo_writev');
 
-#b.attach_kprobe(event='ksys_write', fn_name='kprobe_ksys_write');
-#b.attach_kretprobe(event='ksys_write', fn_name='kretprobedo_write');
-
 b.attach_kprobe(b.get_syscall_fnname('close'), fn_name='syscall__close')
-#b.attach_kprobe(event='sock_close', fn_name='kprobe_sock_close');
-
-#b.attach_kprobe(b.get_syscall_fnname('sendfile'), fn_name='syscall__sendfile')
-#b.attach_kretprobe(b.get_syscall_fnname('sendfile'), fn_name='kprobe_ret_sys_sendfile')
-
-#b.attach_kprobe(event='do_sendfile', fn_name='kprobe_do_sendfile')
 b.attach_kretprobe(event='do_sendfile', fn_name='kretprobe_do_sendfile')
+
+b.attach_kretprobe(event='__sys_sendmsg', fn_name='kretprobe_sys_sendto')
+b.attach_kretprobe(event='__sys_sendto', fn_name='kretprobe_sys_sendto')
+#b.attach_kprobe(event='__sys_sendmsg', fn_name='kprobe_sys_sendmsg')
+#b.attach_kprobe(b.get_syscall_fnname('sendto'), fn_name='kprobe_sys_sendto')
+#b.attach_kprobe(b.get_syscall_fnname('sendmsg'), fn_name='kprobe_sys_sendto')
 
 # An async function that binds to localhost:31337 (To get an output for the above)
 def call_bind_async():
@@ -126,3 +121,16 @@ while True:
     except KeyboardInterrupt:
         print('Bye !')
         break
+
+#b.attach_kprobe(event='sock_close', fn_name='kprobe_sock_close');
+
+#b.attach_kprobe(b.get_syscall_fnname('sendfile'), fn_name='syscall__sendfile')
+#b.attach_kretprobe(b.get_syscall_fnname('sendfile'), fn_name='kprobe_ret_sys_sendfile')
+
+#b.attach_kprobe(event='do_sendfile', fn_name='kprobe_do_sendfile')
+
+#b.attach_kprobe(event='ksys_write', fn_name='kprobe_ksys_write');
+#b.attach_kretprobe(event='ksys_write', fn_name='kretprobedo_write');
+#b.attach_kretprobe(event='__sys_sendmsg', fn_name='kretprobesys_sendmsg')
+#b.attach_kretprobe(event='__sys_sendto', fn_name='kretprobesys_sendto')
+

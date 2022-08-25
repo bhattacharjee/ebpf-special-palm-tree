@@ -27,7 +27,7 @@ static u64 get_module_name(struct file* fp, char* pmodule_name)
                 &owner,
                 sizeof(void*),
                 (char*)fops + offsetof(struct file_operations, owner)))
-        return fops;
+        return (u64)fops;
 
     if (0 != bpf_probe_read(
                 pmodule_name,
@@ -135,7 +135,7 @@ static void* get_file_from_fd(int fd, int* handlecount)
 
 static int is_interesting_port(int port)
 {
-    return 1;
+    return (port == 8080 || port == 8090) ? 1: 0;
 }
 
 #define TYPE_RECVFROM           1
@@ -249,122 +249,6 @@ int kretprobesys_recvfrom(struct pt_regs* ctx)
 int kretprobesys_recvmsg(struct pt_regs* ctx)
 {
     return on_recv_ret_common(ctx, TYPE_RECVMSG, PT_REGS_PARM1(ctx), PT_REGS_RC(ctx));
-}
-
-//----------------------------------------------
-
-static int on_send_common(
-        struct pt_regs*     ctx, 
-        int                 fd, 
-        void*               buf, 
-        size_t              len, 
-        unsigned int        flags, 
-        struct sockaddr*    sa, 
-        int                 addrlen, 
-        int                 type)
-{
-    data_t          data            = { 0 };
-    u64             pid_tgid        = bpf_get_current_pid_tgid();
-    int             fdhandle        = fd;
-    struct file*    pfile           = 0;
-    int             track_flags     = TRACK_FLAGS_TRACK;
-
-    bpf_get_current_comm(&data.process_name, sizeof(data.process_name));
-    //{if_not_condition}
-        //{return} 0;
-    
-    //pfile = get_file_from_fd(fd, 0);
-    //if (!pfile || !hash_tracking.lookup(&pfile))
-        return 0;
-
-
-    pfile = get_file_from_fd(fd, 0);
-
-    //if (!hash_tracking.lookup(&pfile))
-     //   return 0;
-
-    data.event_type[0] = 's';
-    data.event_type[1] = 'e';
-    data.event_type[2] = 'n';
-    data.event_type[3] = 'd';
-    data.event_type[3] = 't';
-    data.event_type[4] = 'o';
-    data.event_type[5] = 0;
-
-    data.socket_fd = fd;
-    data.length = (u64)pfile;
-    data.pid = pid_tgid & 0xffffffff;
-
-    if (!pfile || !hash_tracking.lookup(&pfile))
-        data.event_type[0] = 'X';
-
-    data.timestamp = bpf_ktime_get_boot_ns();
-    events.perf_submit(ctx, &data, sizeof(data));
-
-    return 0;
-}
-
-#if 0
-static int on_send_ret_common(struct pt_regs* ctx, int type)
-{
-    data_t          data            = { 0 };
-    u64             pid_tgid        = bpf_get_current_pid_tgid();
-    int             fdhandle        = PT_REGS_PARM1(ctx);
-    struct file*    pfile           = 0;
-
-    bpf_get_current_comm(&data.process_name, sizeof(data.process_name));
-    //{if_not_condition}
-        //{return} 0;
-    
-    pfile = get_file_from_fd(fdhandle, 0);
-
-    data.event_type[0] = 'S';
-    data.event_type[1] = 'E';
-    data.event_type[2] = 'N';
-    data.event_type[3] = 'D';
-    data.event_type[4] = 0;
-    if (TYPE_SENDTO == type)
-    {
-        data.event_type[4] = 'T';
-        data.event_type[5] = 'o';
-        data.event_type[6] = 0;
-    }
-
-    if (!pfile || !hash_tracking.lookup(&pfile))
-        data.event_type[0] = 'X';
-
-    if (!hash_tracking.lookup(&pfile))
-        data.event_type[0] = 'X';
-        //hash_send_context.insert(&pid_tgid, &fdhandle);
-
-    data.socket_fd = fdhandle;
-    data.length = pfile;
-    data.pid = pid_tgid & 0xffffffff;
-
-    events.perf_submit(ctx, &data, sizeof(data));
-
-    return 0;
-}
-
-int kretprobesys_sendto(struct pt_regs* ctx)
-{
-    return on_send_ret_common(ctx, TYPE_SENDTO);
-}
-
-int kretprobesys_sendmsg(struct pt_regs* ctx)
-{
-    return on_send_ret_common(ctx, TYPE_SENDMSG);
-}
-#endif
-
-int kprobe_sys_sendto(struct pt_regs* ctx, int fd, void* buf, size_t len, unsigned int flags, struct sockaddr* sa, int addr_len)
-{
-    return on_send_common(ctx, fd, buf, len, flags, sa, addr_len, TYPE_SENDTO);
-}
-
-int kprobe_sys_sendmsg(struct pt_regs* ctx, int fd, struct user_msghdr* msg, unsigned int flags)
-{
-    return on_send_common(ctx, fd, 0, 0, 0, 0, 0, TYPE_SENDMSG);
 }
 
 //----------------------------------------------
@@ -679,6 +563,7 @@ int syscall__close(struct pt_regs* ctx, int tempfd)
     data.length = 0;
     //data.length = pfile;
 
+    data.timestamp = bpf_ktime_get_boot_ns();
     events.perf_submit(ctx, &data, sizeof(data));
 
     return 0;
@@ -698,22 +583,6 @@ int kprobe_sock_close(struct pt_regs* ctx, void* x, void* s)
 }
 
 // ------------------------------
-#if 0
-int kprobe_do_sendfile(struct pt_regs* ctx, int out_fd, int in_fd, unsigned long offset, size_t count)
-{
-    int             fd              = out_fd;
-    u64             pid_tgid        = bpf_get_current_pid_tgid();
-    data_t          data            = { 0 };
-
-    bpf_get_current_comm(&data.process_name, sizeof(data.process_name));
-    //{if_not_condition}
-        //{return} 0;
-    
-    hash_fntrack.update(&pid_tgid, &fd);
-
-    return 0;
-}
-#endif
 
 int kretprobe_do_sendfile(struct pt_regs* ctx)
 {
@@ -751,3 +620,145 @@ int kretprobe_do_sendfile(struct pt_regs* ctx)
 
     return 0;
 }
+// --------------------------------------------------------------
+static void logfd(struct pt_regs* ctx, int fd)
+{
+    data_t          data            = { 0 };
+    u64             pid_tgid        = bpf_get_current_pid_tgid();
+    struct file*    pfile           = 0;
+
+    bpf_get_current_comm(&data.process_name, sizeof(data.process_name));
+    //{if_not_condition}
+        //{return};
+
+    pfile = get_file_from_fd((int)fd, 0);
+
+    data.event_type[0] = 'X';
+    data.event_type[1] = 'X';
+    data.event_type[2] = 'X';
+    data.event_type[3] = 'X';
+    data.event_type[4] = 0;
+
+    data.socket_fd = fd;
+    data.length = (u64)pfile;
+    data.timestamp = bpf_ktime_get_boot_ns();
+    events.perf_submit(ctx, &data, sizeof(data));
+}
+
+
+static int on_send_common(
+        struct pt_regs*     ctx, 
+        int                 fd, 
+        void*               buf, 
+        size_t              len, 
+        unsigned int        flags, 
+        struct sockaddr*    sa, 
+        int                 addrlen, 
+        int                 type)
+{
+    data_t          data            = { 0 };
+    u64             pid_tgid        = bpf_get_current_pid_tgid();
+    int             fdhandle        = fd;
+    struct file*    pfile           = 0;
+    int             track_flags     = TRACK_FLAGS_TRACK;
+
+    bpf_get_current_comm(&data.process_name, sizeof(data.process_name));
+    //{if_not_condition}
+        //{return} 0;
+    
+    pfile = get_file_from_fd(fd, 0);
+    if (!pfile || !hash_tracking.lookup(&pfile))
+        return 0;
+
+
+    pfile = get_file_from_fd(fd, 0);
+
+    if (!hash_tracking.lookup(&pfile))
+        return 0;
+
+    hash_fntrack.update(&pid_tgid, &fdhandle);
+
+#if 0
+    data.event_type[0] = 's';
+    data.event_type[1] = 'e';
+    data.event_type[2] = 'n';
+    data.event_type[3] = 'd';
+    data.event_type[4] = 0;
+
+    data.socket_fd = fd;
+    data.length = (u64)pfile;
+    data.pid = pid_tgid & 0xffffffff;
+
+    if (!pfile || !hash_tracking.lookup(&pfile))
+        data.event_type[0] = 'X';
+
+    //logfd(ctx, fd);
+    //data.timestamp = bpf_ktime_get_boot_ns();
+    //events.perf_submit(ctx, &data, sizeof(data));
+#endif
+
+    return 0;
+}
+
+int kprobe_sys_sendto(struct pt_regs* ctx, int fd) //, void* buf, size_t len, unsigned int flags, struct sockaddr* sa, int addr_len)
+{
+    //return on_send_common(ctx, fd, buf, len, flags, sa, addr_len, TYPE_SENDTO);
+    return on_send_common(ctx, fd, 0, 0, 0, 0, 0, TYPE_SENDTO);
+}
+
+
+int kretprobe_sys_sendto(struct pt_regs* ctx)
+{
+    data_t              data            = { 0 };
+    u64                 pid_tgid        = bpf_get_current_pid_tgid();
+    int                 tempfd          = 0;
+    int*                pfd             = 0;
+    struct file*        pfile           = 0;
+
+    bpf_get_current_comm(&data.process_name, sizeof(data.process_name));
+    //{if_not_condition}
+        //{return} 0;
+
+    pfd = hash_fntrack.lookup(&pid_tgid);
+    if (!pfd)
+        return 0;
+    tempfd = *pfd;
+
+    data.event_type[0] = 's';
+    data.event_type[1] = 'e';
+    data.event_type[2] = 'n';
+    data.event_type[3] = 'd';
+    data.event_type[4] = 'X';
+    data.event_type[5] = 'X';
+    data.event_type[6] = 'X';
+    data.event_type[7] = 0;
+
+    data.socket_fd = tempfd;
+    data.pid = pid_tgid & 0xffffffff;
+    pfile = get_file_from_fd((int)tempfd, 0);
+    if (!pfile)
+	    return 0;
+    data.length = (u64)PT_REGS_RC(ctx);
+    data.timestamp = bpf_ktime_get_boot_ns();
+    events.perf_submit(ctx, &data, sizeof(data));
+
+    hash_fntrack.delete(&pid_tgid);
+
+    return 0;
+}
+
+# if 0
+int kprobe_sys_sendmsg(struct pt_regs* ctx, int fd) //, struct user_msghdr* msg, unsigned int flags)
+{
+    return on_send_common(ctx, fd, 0, 0, 0, 0, 0, TYPE_SENDMSG);
+}
+int kretprobe_sys_sendmsg(struct pt_regs* ctx)
+{
+    //logfd(ctx, PT_REGS_PARM1(ctx));
+    return 0;
+}
+# endif
+
+//----------------------------------------------
+
+//----------------------------------------------
