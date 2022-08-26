@@ -135,7 +135,7 @@ static void* get_file_from_fd(int fd, int* handlecount)
 
 static int is_interesting_port(int port)
 {
-    return (port == 8080 || port == 8090) ? 1: 0;
+    return (port == 443 || port == 80) ? 1: 0;
 }
 
 #define TYPE_RECVFROM           1

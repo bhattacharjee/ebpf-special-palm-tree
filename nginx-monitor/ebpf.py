@@ -64,6 +64,7 @@ class Data(ct.Structure):
         ('timestamp', ct.c_int64),
     ]
 
+f_out = open("out.txt", "w")
 # A callback to be called for every record in the 'events' BPF data structure
 def print_event(cpu, data, size):
     data = ct.cast(data, ct.POINTER(Data)).contents
@@ -74,6 +75,14 @@ def print_event(cpu, data, size):
         socket_fd=hex(data.socket_fd), 
         timestamp=data.timestamp,
         length=hex(data.length)))
+    f_out.write('{evttype} procname={process_name} pid={pid} socketid={socket_fd} timestamp={timestamp} length={length} \n'.format(
+        evttype=data.event_type,
+        process_name=data.process_name,
+        pid=data.pid,
+        socket_fd=hex(data.socket_fd),
+        timestamp=data.timestamp,
+        length=hex(data.length)))
+    f_out.flush()
 
 # This calls libbpf, which in turns calls the bpf(2) syscall, and does a few more tricks to attach the kernel probe
 b.attach_kprobe(event='__sys_bind', fn_name='kprobe_sys_bind')
